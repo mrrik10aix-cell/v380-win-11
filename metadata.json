@@ -1,0 +1,11 @@
+{
+  "name": "Remix V380 Pro (wind11)",
+  "description": "Professional smart video monitoring and security system with remote live streaming, AI motion tracking, voice talkback, cloud recording, device sharing, and AI security analysis.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

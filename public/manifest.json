@@ -1,0 +1,47 @@
+{
+  "name": "V380 Pro Desktop Security System",
+  "short_name": "V380 Pro Win11",
+  "description": "Windows 11 Native Smart Video Security & Camera Control Station with AI Motion Analysis",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#09090b",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["security", "utilities", "smart-home"],
+  "shortcuts": [
+    {
+      "name": "Live Camera Feed",
+      "short_name": "Live Feed",
+      "description": "Open 1CH / 4CH / 9CH live stream monitor",
+      "url": "/?tab=devices"
+    },
+    {
+      "name": "Alarm Messages",
+      "short_name": "Alarms",
+      "description": "View motion alerts and security logs",
+      "url": "/?tab=events"
+    },
+    {
+      "name": "AI Security Report",
+      "short_name": "AI Report",
+      "description": "Generate Gemini AI threat assessment",
+      "url": "/?tab=ai-report"
+    }
+  ]
+}
