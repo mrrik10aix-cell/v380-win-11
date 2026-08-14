@@ -510,6 +510,21 @@ function drawOSDOverlay(
     ctx.fillText('[NV] FULL COLOR', 75, 36);
   }
 
+  // Live Audio / Microphone OSD status
+  if (device.isPrivacyMode) {
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = '#60a5fa';
+    ctx.fillText('[MIC OFF - PRIVACY]', w - 260, 22);
+  } else if (!device.isMuted) {
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = '#34d399'; // Emerald
+    ctx.fillText('[MIC LIVE 48kHz]', w - (isRecording || device.isRecording ? 245 : 180), 22);
+  } else {
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = '#94a3b8'; // Slate
+    ctx.fillText('[MIC MUTED]', w - (isRecording || device.isRecording ? 225 : 160), 22);
+  }
+
   // Timestamp on Top Right
   ctx.font = 'bold 12px monospace';
   ctx.fillStyle = '#fef08a'; // yellow ticker

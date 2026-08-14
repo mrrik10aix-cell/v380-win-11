@@ -141,8 +141,10 @@ export const DeviceSettingsModal: React.FC<DeviceSettingsModalProps> = ({
                 <span className="font-mono text-orange-300 font-bold text-xs">{device.imouSettings?.imouDeviceId ?? device.id}</span>
               </div>
               <div className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-lg">
-                <span className="text-zinc-400 text-[10px] block">Imou Protect Cloud:</span>
-                <span className="font-mono text-emerald-400 font-bold text-xs">{device.imouSettings?.cloudPlan ?? 'Imou_Protect_30Day'}</span>
+                <span className="text-zinc-400 text-[10px] block">Personal Cloud Sync:</span>
+                <span className="font-mono text-emerald-400 font-bold text-xs">
+                  {device.storage?.cloudSyncActive ? 'Google Drive / OneDrive' : 'Paused'}
+                </span>
               </div>
             </div>
 

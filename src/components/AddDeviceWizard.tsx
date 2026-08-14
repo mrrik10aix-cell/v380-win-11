@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Device, SceneType } from '../types';
+import { Device, SceneType, DiscoveredNetworkDevice } from '../types';
+import { SoundwavePairing } from './SoundwavePairing';
+import { NetworkScanDiscovery } from './NetworkScanDiscovery';
 import {
   QrCode,
   Wifi,
@@ -23,7 +25,10 @@ import {
   Info,
   ChevronRight,
   ShieldCheck,
-  Server
+  Server,
+  Zap,
+  Globe,
+  Sliders
 } from 'lucide-react';
 
 interface AddDeviceWizardProps {
@@ -53,17 +58,23 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
   const [devicePassword, setDevicePassword] = useState<string>('admin888');
   const [showDevicePass, setShowDevicePass] = useState<boolean>(false);
 
-  // Device Customization
+  // Device Customization & Discovered LAN parameters
   const [name, setName] = useState<string>('Front Porch ICSee 4K PTZ');
   const [sceneType, setSceneType] = useState<SceneType>('front_porch');
   const [enableGoogleHomeSync, setEnableGoogleHomeSync] = useState<boolean>(true);
+  const [discoveredDevice, setDiscoveredDevice] = useState<DiscoveredNetworkDevice | null>(null);
+  const [ipAddress, setIpAddress] = useState<string>('192.168.1.145');
+  const [macAddress, setMacAddress] = useState<string>('C4:09:38:A2:1F:00');
+  const [primaryPort, setPrimaryPort] = useState<number>(34567);
+  const [rtspPort, setRtspPort] = useState<number>(554);
+  const [firmwareVersion, setFirmwareVersion] = useState<string>('v5.08.R19.ICSEE');
+  const [autoPopulatedNotice, setAutoPopulatedNotice] = useState<string | null>(null);
 
   // Interactive pairing simulation
   const [pairingStage, setPairingStage] = useState<number>(0);
   const [isPairing, setIsPairing] = useState<boolean>(false);
   const [soundwavePlaying, setSoundwavePlaying] = useState<boolean>(false);
   const [qrScanned, setQrScanned] = useState<boolean>(false);
-  const [foundLanDevices, setFoundLanDevices] = useState<Array<{ id: string; ip: string; mac: string; model: string }>>([]);
 
   // Reset wizard on open
   useEffect(() => {
@@ -73,12 +84,29 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
       setIsPairing(false);
       setQrScanned(false);
       setSoundwavePlaying(false);
+      setDiscoveredDevice(null);
+      setAutoPopulatedNotice(null);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const isWifi5GWarning = wifiSsid.toLowerCase().includes('5g') || wifiSsid.toLowerCase().includes('5ghz');
+
+  const handleSelectDiscoveredDevice = (device: DiscoveredNetworkDevice) => {
+    setDiscoveredDevice(device);
+    setSelectedBrand(device.brand);
+    setName(device.defaultName);
+    setSceneType(device.suggestedScene);
+    setIpAddress(device.ip);
+    setMacAddress(device.mac);
+    setPrimaryPort(device.ports.primary);
+    setRtspPort(device.ports.rtsp);
+    setFirmwareVersion(device.firmware);
+    setAutoPopulatedNotice(
+      `Parameters Auto-Populated: ${device.model} (${device.ip}:${device.ports.primary})`
+    );
+  };
 
   const handleStartPairingProcess = () => {
     setStep(3);
@@ -94,20 +122,15 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
     }, 3600);
   };
 
-  const handleScanLan = () => {
-    setFoundLanDevices([
-      { id: 'cam-netip-01', ip: '192.168.1.145', mac: 'C4:09:38:A2:1F:00', model: 'Xiongmai NETIP 4K PTZ (Port 34567)' },
-      { id: 'cam-v380-02', ip: '192.168.1.188', mac: 'A0:32:B1:C3:4D:11', model: 'V380 Pro Smart Dome (Port 8800)' },
-    ]);
-  };
-
   const handleFinishAdd = () => {
     const isImou = selectedBrand === 'Imou_Life';
     const isICSee = selectedBrand === 'ICSee' || selectedBrand === 'ICSee_Pro' || selectedBrand === 'XMEye';
     const newDev: Device = {
       id: `dev-${Date.now()}`,
       name,
-      model: isImou
+      model: discoveredDevice
+        ? discoveredDevice.model
+        : isImou
         ? 'IMOU Life Rex 3D 5MP AI PTZ'
         : isICSee
         ? 'ICSee Pro Dual-Lens 4K PTZ Speed Dome (NETIP)'
@@ -121,12 +144,13 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
       isSirenOn: false,
       isNightVision: false,
       nightVisionMode: 'smart',
-      quality: '4K',
+      quality: discoveredDevice?.resolution.includes('5MP') ? 'FHD' : '4K',
       fps: 30,
       bitrate: '2.5 MB/s',
-      signalStrength: 98,
+      signalStrength: discoveredDevice ? Math.min(100, Math.max(70, 100 + (discoveredDevice.signalDbm + 40))) : 98,
+      pingMs: discoveredDevice?.latencyMs || 14,
       appBrand: selectedBrand,
-      protocol: isImou ? 'Imou_SDK' : isICSee ? 'NETIP_ICSee' : 'V380_SDK',
+      protocol: discoveredDevice ? discoveredDevice.protocol : isImou ? 'Imou_SDK' : isICSee ? 'NETIP_ICSee' : 'V380_SDK',
       googleHome: {
         linked: enableGoogleHomeSync,
         googleDeviceId: `gh-cam-${Date.now().toString().slice(-4)}`,
@@ -140,23 +164,23 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
             petDetection: true,
             activeDeterrenceStrobe: true,
             alarmSoundProfile: '110dB_Siren',
-            cloudPlan: 'Imou_Protect_30Day',
             privacyMasking: false,
           }
         : undefined,
       icseeSettings: isICSee
         ? {
-            netipPort: 34567,
-            rtspPort: 554,
+            netipPort: primaryPort,
+            rtspPort: rtspPort,
             dualLensMode: true,
             humanoidTracking: true,
             cordonAlarm: true,
-            cloudProvider: selectedBrand === 'XMEye' ? 'XMEye_Cloud' : 'ICSee_Cloud',
+            cloudProvider: 'Google_Drive',
           }
         : undefined,
       storage: {
-        cloudActive: true,
-        cloudExpiresDays: 30,
+        cloudSyncActive: true,
+        cloudProvider: 'Google_Drive',
+        lastSyncTime: 'Just now',
         sdCardSizeGB: 128,
         sdCardUsedGB: 8.5,
       },
@@ -170,9 +194,9 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
       detectionZoneGrid: Array(6).fill(null).map(() => Array(6).fill(true)),
       sharedWith: [],
       sceneType,
-      ipAddress: '192.168.1.145',
-      macAddress: `C4:09:38:${Math.floor(Math.random() * 89 + 10)}:${Math.floor(Math.random() * 89 + 10)}:${Math.floor(Math.random() * 89 + 10)}`,
-      firmwareVersion: isICSee ? 'v5.08.R19.ICSEE' : 'v3.80.2026.09',
+      ipAddress: ipAddress,
+      macAddress: macAddress,
+      firmwareVersion: firmwareVersion,
     };
 
     onAddDevice(newDev);
@@ -248,6 +272,38 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Fast-Track LAN Network Scan Callout */}
+            <div className="bg-gradient-to-r from-blue-950/40 via-zinc-900/60 to-purple-950/30 border border-blue-500/30 rounded-xl p-3 flex items-center justify-between gap-3 shadow-md">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                    <span>Quick Network Scan (LAN Discovery)</span>
+                    <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-mono font-bold">
+                      Auto-Populate
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-zinc-400">
+                    Scan local router for NETIP, V380, IMOU or ONVIF cameras and auto-fill parameters.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMethod('lan');
+                  setStep(2);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 shadow-md shadow-blue-900/30 transition-all flex items-center gap-1 active:scale-95"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Scan LAN</span>
+              </button>
             </div>
 
             {/* Hardware Checklist Before Connection */}
@@ -432,98 +488,83 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
               </button>
             </div>
 
+            {/* Auto-populated Parameters Notice Banner */}
+            {autoPopulatedNotice && (
+              <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-emerald-200">{autoPopulatedNotice}</p>
+                    <p className="text-[10px] text-emerald-400/80 font-mono">
+                      MAC: {macAddress} | Protocol: {discoveredDevice?.protocol || 'NETIP'} | RTSP: {rtspPort}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded uppercase">
+                  LAN Linked
+                </span>
+              </div>
+            )}
+
             {/* Dynamic Interactive Pairing Guide based on Method */}
-            <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 flex flex-col items-center text-center gap-3">
-              {method === 'qr' && (
-                <>
-                  <div className="bg-white p-3 rounded-xl shadow-xl border border-zinc-300 relative group">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=WIFI:S:${encodeURIComponent(
-                        wifiSsid
-                      )};P:${encodeURIComponent(wifiPass)};B:${selectedBrand};;`}
-                      alt="Pairing QR Code"
-                      className="w-32 h-32"
-                    />
-                    {qrScanned && (
-                      <div className="absolute inset-0 bg-emerald-600/90 rounded-xl flex flex-col items-center justify-center text-white font-bold text-xs">
-                        <CheckCircle2 className="w-8 h-8 mb-1" />
-                        <span>QR Code Scanned!</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-zinc-300">
-                    Hold phone screen <strong>15–20 cm (6–8 inches)</strong> in front of camera lens until camera speaks <em>"QR Code Scanned Successfully"</em>.
-                  </p>
-                  <button
-                    onClick={() => setQrScanned(true)}
-                    className="px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-xs font-bold transition-all border border-emerald-500/30"
-                  >
-                    Simulate Camera "Beep / QR Scanned" Sound
-                  </button>
-                </>
-              )}
-
-              {method === 'soundwave' && (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 relative">
-                    <Volume2 className={`w-8 h-8 ${soundwavePlaying ? 'animate-bounce text-purple-300' : ''}`} />
-                    {soundwavePlaying && (
-                      <span className="absolute inset-0 rounded-full border-2 border-purple-500 animate-ping"></span>
-                    )}
-                  </div>
-                  <p className="text-xs text-zinc-300">
-                    Turn up phone volume to max and hold phone speaker near camera microphone.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setSoundwavePlaying(true);
-                      setTimeout(() => setSoundwavePlaying(false), 2000);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold text-xs shadow transition-all"
-                  >
-                    {soundwavePlaying ? 'Playing High-Frequency Soundwave...' : 'Play Soundwave Tone'}
-                  </button>
-                </>
-              )}
-
-              {method === 'bt' && (
-                <div className="w-full flex flex-col items-center gap-2 py-2">
-                  <Bluetooth className="w-8 h-8 text-blue-400 animate-pulse" />
-                  <p className="text-xs text-zinc-300 font-bold">Bluetooth Advertising Signal Active</p>
-                  <p className="text-[11px] text-zinc-400">Found: [ICSee_BT_Cam_9942] (Signal: -48dBm)</p>
-                </div>
-              )}
-
-              {method === 'lan' && (
-                <div className="w-full flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-200">Local Router NETIP Devices:</span>
-                    <button
-                      onClick={handleScanLan}
-                      className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-blue-400 font-bold flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3" /> Scan Subnet
-                    </button>
-                  </div>
-
-                  {foundLanDevices.length === 0 ? (
-                    <p className="text-xs text-zinc-500 py-3 italic">Click "Scan Subnet" to search local network IP range...</p>
-                  ) : (
-                    <div className="flex flex-col gap-1.5 text-left">
-                      {foundLanDevices.map((d) => (
-                        <div key={d.id} className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs flex justify-between items-center">
-                          <div>
-                            <p className="font-bold text-zinc-200">{d.model}</p>
-                            <p className="text-[10px] text-zinc-400 font-mono">{d.ip} | MAC: {d.mac}</p>
-                          </div>
-                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">READY</span>
+            {method === 'soundwave' ? (
+              <SoundwavePairing
+                wifiSsid={wifiSsid}
+                wifiPass={wifiPass}
+                cameraBrand={
+                  selectedBrand === 'Imou_Life'
+                    ? 'IMOU'
+                    : selectedBrand === 'V380_Pro'
+                    ? 'V380'
+                    : 'ICSee'
+                }
+                onCameraAck={() => setResetToneChecked(true)}
+              />
+            ) : method === 'lan' ? (
+              <NetworkScanDiscovery
+                onSelectDevice={handleSelectDiscoveredDevice}
+                selectedDeviceId={discoveredDevice?.id}
+              />
+            ) : (
+              <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 flex flex-col items-center text-center gap-3">
+                {method === 'qr' && (
+                  <>
+                    <div className="bg-white p-3 rounded-xl shadow-xl border border-zinc-300 relative group">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=WIFI:S:${encodeURIComponent(
+                          wifiSsid
+                        )};P:${encodeURIComponent(wifiPass)};B:${selectedBrand};;`}
+                        alt="Pairing QR Code"
+                        className="w-32 h-32"
+                      />
+                      {qrScanned && (
+                        <div className="absolute inset-0 bg-emerald-600/90 rounded-xl flex flex-col items-center justify-center text-white font-bold text-xs">
+                          <CheckCircle2 className="w-8 h-8 mb-1" />
+                          <span>QR Code Scanned!</span>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    <p className="text-xs text-zinc-300">
+                      Hold phone screen <strong>15–20 cm (6–8 inches)</strong> in front of camera lens until camera speaks <em>"QR Code Scanned Successfully"</em>.
+                    </p>
+                    <button
+                      onClick={() => setQrScanned(true)}
+                      className="px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-xs font-bold transition-all border border-emerald-500/30 cursor-pointer"
+                    >
+                      Simulate Camera "Beep / QR Scanned" Sound
+                    </button>
+                  </>
+                )}
+
+                {method === 'bt' && (
+                  <div className="w-full flex flex-col items-center gap-2 py-2">
+                    <Bluetooth className="w-8 h-8 text-blue-400 animate-pulse" />
+                    <p className="text-xs text-zinc-300 font-bold">Bluetooth Advertising Signal Active</p>
+                    <p className="text-[11px] text-zinc-400">Found: [ICSee_BT_Cam_9942] (Signal: -48dBm)</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button
@@ -677,6 +718,63 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   <option value="store">Store / Storefront Register</option>
                   <option value="factory">Factory Line</option>
                 </select>
+              </div>
+
+              {/* Discovered / Configured Network Parameters */}
+              <div className="border-t border-zinc-800 pt-3 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-zinc-200 flex items-center gap-1.5 text-xs">
+                    <Server className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Connection & Protocol Parameters</span>
+                  </span>
+                  {discoveredDevice && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded font-mono">
+                      LAN Discovered
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-zinc-950 p-2.5 rounded-xl border border-zinc-800/80 text-[11px]">
+                  <div>
+                    <label className="text-zinc-400 block text-[10px]">Static / LAN IP Address:</label>
+                    <input
+                      type="text"
+                      value={ipAddress}
+                      onChange={(e) => setIpAddress(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-zinc-200 font-mono text-xs focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-zinc-400 block text-[10px]">MAC Hardware Address:</label>
+                    <input
+                      type="text"
+                      value={macAddress}
+                      onChange={(e) => setMacAddress(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-zinc-200 font-mono text-xs focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-zinc-400 block text-[10px]">Primary Socket Port / NETIP:</label>
+                    <input
+                      type="number"
+                      value={primaryPort}
+                      onChange={(e) => setPrimaryPort(Number(e.target.value))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-zinc-200 font-mono text-xs focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-zinc-400 block text-[10px]">RTSP Stream Port:</label>
+                    <input
+                      type="number"
+                      value={rtspPort}
+                      onChange={(e) => setRtspPort(Number(e.target.value))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-zinc-200 font-mono text-xs focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Google Home Smart Bridge Option */}

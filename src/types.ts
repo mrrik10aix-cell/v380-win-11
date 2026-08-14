@@ -59,7 +59,7 @@ export interface Device {
     dualLensMode?: boolean;
     humanoidTracking: boolean;
     cordonAlarm: boolean;
-    cloudProvider: 'ICSee_Cloud' | 'XMEye_Cloud' | 'V380_Cloud' | 'Imou_Protect';
+    cloudProvider?: 'Google_Drive' | 'OneDrive' | 'Google_Cloud' | 'None';
   };
   imouSettings?: {
     imouDeviceId: string;
@@ -67,12 +67,16 @@ export interface Device {
     petDetection: boolean;
     activeDeterrenceStrobe: boolean;
     alarmSoundProfile: '110dB_Siren' | 'Dog_Bark' | 'Custom_Voice' | 'Mute';
-    cloudPlan: 'Imou_Protect_7Day' | 'Imou_Protect_30Day' | 'Local_SD';
     privacyMasking: boolean;
   };
   storage: {
-    cloudActive: boolean;
-    cloudExpiresDays: number;
+    cloudSyncActive: boolean;
+    cloudProvider: 'Google_Drive' | 'OneDrive' | 'Google_Cloud' | 'None';
+    lastSyncTime?: string;
+    lastSuccessfulSyncTime?: string;
+    pendingUploads?: number;
+    syncHealth?: 'optimal' | 'syncing' | 'idle' | 'warning' | 'paused';
+    uploadBandwidthKbps?: number;
     sdCardSizeGB: number;
     sdCardUsedGB: number;
   };
@@ -111,6 +115,7 @@ export interface AlarmEvent {
   timeISO: string;
   snapshotUrl?: string;
   hasCloudVideo: boolean;
+  cloudSyncedTo?: 'Google_Drive' | 'OneDrive' | 'Google_Cloud';
   aiTags: string[];
   aiAnalysis?: string;
   durationSec: number;
@@ -131,14 +136,58 @@ export interface AlbumItem {
   timestamp: string;
   title: string;
   fileSizeMB: number;
+  syncedToCloud?: 'Google_Drive' | 'OneDrive' | 'Google_Cloud';
 }
 
-export interface CloudPlan {
+export interface SavedGridLayout {
   id: string;
   name: string;
-  price: string;
-  period: string;
-  description: string;
-  features: string[];
-  recommended?: boolean;
+  gridMode: '4' | '9';
+  order: string[]; // device ids in position order
+  updatedAt: string;
+}
+
+export interface DiscoveredNetworkDevice {
+  id: string;
+  ip: string;
+  mac: string;
+  model: string;
+  brand: 'ICSee_Pro' | 'ICSee' | 'V380_Pro' | 'Imou_Life' | 'XMEye';
+  protocol: 'NETIP_ICSee' | 'V380_SDK' | 'Imou_SDK' | 'ONVIF';
+  ports: {
+    primary: number;
+    rtsp: number;
+    http?: number;
+  };
+  firmware: string;
+  signalDbm: number;
+  latencyMs: number;
+  isBound: boolean;
+  resolution: string;
+  defaultName: string;
+  suggestedScene: SceneType;
+}
+
+export interface CloudSyncSettings {
+  googleDrive: {
+    connected: boolean;
+    accountEmail: string;
+    targetFolder: string;
+    autoUploadAlarms: boolean;
+    quotaUsedGB: number;
+    quotaTotalGB: number;
+    lastSynced: string;
+  };
+  oneDrive: {
+    connected: boolean;
+    accountEmail: string;
+    targetFolder: string;
+    autoUploadAlarms: boolean;
+    quotaUsedGB: number;
+    quotaTotalGB: number;
+    lastSynced: string;
+  };
+  activeDefaultProvider: 'google_drive' | 'onedrive';
+  syncResolution: 'original' | 'fhd' | 'hd';
+  wifiOnlySync: boolean;
 }

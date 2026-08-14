@@ -1,10 +1,34 @@
-import { Device, AlarmEvent, AlbumItem, CloudPlan, FaceProfile } from '../types';
+import { Device, AlarmEvent, AlbumItem, FaceProfile, CloudSyncSettings } from '../types';
 
 // Empty initial default states (Demo data removed)
 export const INITIAL_DEVICES: Device[] = [];
 export const INITIAL_EVENTS: AlarmEvent[] = [];
 export const INITIAL_ALBUM: AlbumItem[] = [];
 export const INITIAL_FACE_LIBRARY: FaceProfile[] = [];
+
+export const DEFAULT_CLOUD_SYNC_SETTINGS: CloudSyncSettings = {
+  googleDrive: {
+    connected: true,
+    accountEmail: 'user.security@gmail.com',
+    targetFolder: 'My Drive/CCTV_Security_Backups',
+    autoUploadAlarms: true,
+    quotaUsedGB: 4.8,
+    quotaTotalGB: 15,
+    lastSynced: 'Just now',
+  },
+  oneDrive: {
+    connected: true,
+    accountEmail: 'user.personal@outlook.com',
+    targetFolder: 'OneDrive/Security_Footage',
+    autoUploadAlarms: true,
+    quotaUsedGB: 1.2,
+    quotaTotalGB: 5,
+    lastSynced: '10 mins ago',
+  },
+  activeDefaultProvider: 'google_drive',
+  syncResolution: 'fhd',
+  wifiOnlySync: true,
+};
 
 // Sample demo datasets retained for optional manual quick-testing
 export const SAMPLE_DEMO_DEVICES: Device[] = [
@@ -42,11 +66,16 @@ export const SAMPLE_DEMO_DEVICES: Device[] = [
       dualLensMode: true,
       humanoidTracking: true,
       cordonAlarm: true,
-      cloudProvider: 'ICSee_Cloud',
+      cloudProvider: 'Google_Drive',
     },
     storage: {
-      cloudActive: true,
-      cloudExpiresDays: 28,
+      cloudSyncActive: true,
+      cloudProvider: 'Google_Drive',
+      lastSyncTime: '2 mins ago',
+      lastSuccessfulSyncTime: '2026-08-14 04:14:32',
+      pendingUploads: 0,
+      syncHealth: 'optimal',
+      uploadBandwidthKbps: 4500,
       sdCardSizeGB: 128,
       sdCardUsedGB: 42.5,
     },
@@ -104,11 +133,16 @@ export const SAMPLE_DEMO_DEVICES: Device[] = [
       dualLensMode: false,
       humanoidTracking: true,
       cordonAlarm: true,
-      cloudProvider: 'ICSee_Cloud',
+      cloudProvider: 'OneDrive',
     },
     storage: {
-      cloudActive: true,
-      cloudExpiresDays: 14,
+      cloudSyncActive: true,
+      cloudProvider: 'OneDrive',
+      lastSyncTime: '15 mins ago',
+      lastSuccessfulSyncTime: '2026-08-14 03:59:10',
+      pendingUploads: 2,
+      syncHealth: 'syncing',
+      uploadBandwidthKbps: 3200,
       sdCardSizeGB: 256,
       sdCardUsedGB: 110,
     },
@@ -196,50 +230,4 @@ export const SAMPLE_DEMO_ALBUM: AlbumItem[] = [
     title: 'Snapshot_LivingRoom_01.jpg',
     fileSizeMB: 2.1,
   },
-];
-
-export const CLOUD_PLANS: CloudPlan[] = [
-  {
-    id: 'plan-7d',
-    name: '7-Day Event Loop Cloud',
-    price: '$2.99',
-    period: '/month',
-    description: 'Unlimited 7-day motion alert recording stored in encrypted cloud.',
-    features: [
-      '7 days rolling cloud storage',
-      'AES-256 financial-grade encryption',
-      'AI Human & Vehicle Smart Filter',
-      'Instant mobile push alerts with video thumbnail',
-      'Unlimited download & clip export'
-    ],
-  },
-  {
-    id: 'plan-30d',
-    name: '30-Day Event Loop Cloud',
-    price: '$6.99',
-    period: '/month',
-    recommended: true,
-    description: 'Our most popular security plan with 30 days history and priority AI analysis.',
-    features: [
-      '30 days rolling cloud video storage',
-      'Gemini AI Smart Security Insights & Summaries',
-      'Multi-device account sync (up to 5 cameras)',
-      'High-speed cloud video playback (up to 8x speed)',
-      'VIP customer support & loss compensation guarantee'
-    ],
-  },
-  {
-    id: 'plan-24h-full',
-    name: 'Continuous 24/7 Full Recording',
-    price: '$12.99',
-    period: '/month',
-    description: 'Non-stop 24/7 continuous stream archiving on high-speed cloud servers.',
-    features: [
-      'Continuous 24-hour non-stop video recording',
-      '15 days rolling archive',
-      'Ultra HD 4K bitrate streaming optimization',
-      'Automatic offline backup cache resume',
-      'Shared cloud vault for family members'
-    ],
-  }
 ];
