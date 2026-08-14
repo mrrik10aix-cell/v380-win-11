@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Device, SceneType, DiscoveredNetworkDevice } from '../types';
 import { SoundwavePairing } from './SoundwavePairing';
 import { NetworkScanDiscovery } from './NetworkScanDiscovery';
+import { QrCodePhotoScanner } from './QrCodePhotoScanner';
 import {
   QrCode,
   Wifi,
@@ -28,7 +29,8 @@ import {
   Server,
   Zap,
   Globe,
-  Sliders
+  Sliders,
+  HardDrive
 } from 'lucide-react';
 
 interface AddDeviceWizardProps {
@@ -125,6 +127,8 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
   const handleFinishAdd = () => {
     const isImou = selectedBrand === 'Imou_Life';
     const isICSee = selectedBrand === 'ICSee' || selectedBrand === 'ICSee_Pro' || selectedBrand === 'XMEye';
+    const isV380 = selectedBrand === 'V380_Pro';
+
     const newDev: Device = {
       id: `dev-${Date.now()}`,
       name,
@@ -134,7 +138,9 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
         ? 'IMOU Life Rex 3D 5MP AI PTZ'
         : isICSee
         ? 'ICSee Pro Dual-Lens 4K PTZ Speed Dome (NETIP)'
-        : 'V380 Pro Q7 Smart PTZ 4K',
+        : isV380
+        ? 'V380 Pro Q7 Smart PTZ Dome 4K'
+        : 'Universal ONVIF 4K IP Camera',
       status: 'online',
       isRecording: true,
       isMuted: false,
@@ -165,6 +171,16 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
             activeDeterrenceStrobe: true,
             alarmSoundProfile: '110dB_Siren',
             privacyMasking: false,
+          }
+        : undefined,
+      v380Settings: isV380
+        ? {
+            v380DeviceId: `v380-${Date.now().toString().slice(-6)}`,
+            apHotspotSsid: `MV${Date.now().toString().slice(-8)}`,
+            smartLightLinkage: true,
+            voiceIntercomMode: 'full_duplex',
+            alarmSoundMode: 'siren',
+            cloudStoragePackage: '7_day_loop',
           }
         : undefined,
       icseeSettings: isICSee
@@ -243,23 +259,21 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
               <label className="text-xs font-bold text-zinc-200">1. Select Camera Ecosystem / Protocol Brand:</label>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {[
-                  { id: 'ICSee_Pro', label: 'ICSee Pro', desc: '4K NETIP Dual-Lens' },
-                  { id: 'ICSee', label: 'ICSee', desc: 'Xiongmai Speed Dome' },
-                  { id: 'V380_Pro', label: 'V380 Pro', desc: 'V380 Cloud SDK' },
-                  { id: 'Imou_Life', label: 'IMOU Life', desc: 'Dahua Imou AI' },
-                  { id: 'XMEye', label: 'XMEye', desc: 'DVR / ONVIF NVR' },
+                  { id: 'ICSee_Pro', label: 'ICSee Pro', desc: '4K NETIP Dual-Lens', port: 34567, proto: 'NETIP', name: 'Front Porch ICSee 4K PTZ', scene: 'front_porch', fw: 'v5.08.R19.ICSEE' },
+                  { id: 'ICSee', label: 'ICSee', desc: 'Xiongmai Speed Dome', port: 34567, proto: 'NETIP', name: 'Driveway ICSee 4K Dome', scene: 'front_porch', fw: 'v5.00.R02.ICSEE' },
+                  { id: 'V380_Pro', label: 'V380 Pro', desc: 'V380 Cloud SDK', port: 8800, proto: 'V380 SDK', name: 'Store V380 Pro 4K Dome', scene: 'store', fw: 'v3.80.2026.09.Q7' },
+                  { id: 'Imou_Life', label: 'IMOU Life', desc: 'Dahua Imou AI', port: 37777, proto: 'Dahua P2P', name: 'Living Room IMOU Rex 3D', scene: 'living_room', fw: 'v2.800.0000000.12.R' },
+                  { id: 'XMEye', label: 'XMEye', desc: 'DVR / ONVIF NVR', port: 34567, proto: 'NETIP / ONVIF', name: 'Backyard XMEye Pro PTZ', scene: 'backyard', fw: 'v4.02.R11.XMEYE' },
                 ].map((b) => (
                   <button
                     key={b.id}
                     onClick={() => {
                       setSelectedBrand(b.id as any);
-                      if (b.id === 'Imou_Life') {
-                        setName('Living Room IMOU Rex 3D');
-                      } else if (b.id === 'ICSee' || b.id === 'ICSee_Pro') {
-                        setName('Front Porch ICSee 4K PTZ');
-                      } else {
-                        setName('Store V380 Pro Camera');
-                      }
+                      setName(b.name);
+                      setSceneType(b.scene as SceneType);
+                      setPrimaryPort(b.port);
+                      setRtspPort(554);
+                      setFirmwareVersion(b.fw);
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       selectedBrand === b.id
@@ -269,6 +283,7 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   >
                     <div className="text-xs font-bold">{b.label}</div>
                     <div className="text-[9px] text-zinc-400 font-normal truncate">{b.desc}</div>
+                    <div className="text-[8px] text-blue-400/80 font-mono mt-0.5">{b.proto} :{b.port}</div>
                   </button>
                 ))}
               </div>
@@ -525,37 +540,40 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                 onSelectDevice={handleSelectDiscoveredDevice}
                 selectedDeviceId={discoveredDevice?.id}
               />
+            ) : method === 'qr' ? (
+              <QrCodePhotoScanner
+                wifiSsid={wifiSsid}
+                wifiPass={wifiPass}
+                selectedBrand={selectedBrand}
+                isScanned={qrScanned}
+                onCameraScanned={() => setQrScanned(true)}
+                onQrDecoded={(decoded) => {
+                  setQrScanned(true);
+                  if (decoded.brand) {
+                    setSelectedBrand(decoded.brand);
+                  }
+                  if (decoded.macAddress) {
+                    setMacAddress(decoded.macAddress);
+                  }
+                  if (decoded.ipAddress) {
+                    setIpAddress(decoded.ipAddress);
+                  }
+                  if (decoded.port) {
+                    setPrimaryPort(decoded.port);
+                  }
+                  if (decoded.ssid) {
+                    setWifiSsid(decoded.ssid);
+                  }
+                  if (decoded.password) {
+                    setWifiPass(decoded.password);
+                  }
+                  setAutoPopulatedNotice(
+                    `QR Code Photo Decoded from Local Storage: ${decoded.brand || selectedBrand} (${decoded.fileName || 'Image'})`
+                  );
+                }}
+              />
             ) : (
               <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 flex flex-col items-center text-center gap-3">
-                {method === 'qr' && (
-                  <>
-                    <div className="bg-white p-3 rounded-xl shadow-xl border border-zinc-300 relative group">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=WIFI:S:${encodeURIComponent(
-                          wifiSsid
-                        )};P:${encodeURIComponent(wifiPass)};B:${selectedBrand};;`}
-                        alt="Pairing QR Code"
-                        className="w-32 h-32"
-                      />
-                      {qrScanned && (
-                        <div className="absolute inset-0 bg-emerald-600/90 rounded-xl flex flex-col items-center justify-center text-white font-bold text-xs">
-                          <CheckCircle2 className="w-8 h-8 mb-1" />
-                          <span>QR Code Scanned!</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-zinc-300">
-                      Hold phone screen <strong>15–20 cm (6–8 inches)</strong> in front of camera lens until camera speaks <em>"QR Code Scanned Successfully"</em>.
-                    </p>
-                    <button
-                      onClick={() => setQrScanned(true)}
-                      className="px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-xs font-bold transition-all border border-emerald-500/30 cursor-pointer"
-                    >
-                      Simulate Camera "Beep / QR Scanned" Sound
-                    </button>
-                  </>
-                )}
-
                 {method === 'bt' && (
                   <div className="w-full flex flex-col items-center gap-2 py-2">
                     <Bluetooth className="w-8 h-8 text-blue-400 animate-pulse" />
@@ -587,10 +605,19 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
         {step === 3 && (
           <div className="flex flex-col gap-5 py-4">
             <div className="bg-[#09090b] border border-zinc-800 rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-xs font-bold text-zinc-200 flex items-center gap-2 border-b border-zinc-800 pb-3">
-                <Server className="w-4 h-4 text-blue-400" />
-                <span>Executing Protocol Socket Handshake ({selectedBrand})</span>
-              </h3>
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-blue-400" />
+                  <span>Protocol Socket Handshake ({selectedBrand})</span>
+                </h3>
+                <span className="text-[10px] font-mono bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-bold">
+                  {selectedBrand === 'Imou_Life'
+                    ? 'Dahua P2P 37777/TCP'
+                    : selectedBrand === 'V380_Pro'
+                    ? 'Macro-video 8800/UDP'
+                    : 'NETIP 34567/TCP'}
+                </span>
+              </div>
 
               <div className="flex flex-col gap-3 text-xs">
                 {/* Stage 1 */}
@@ -608,9 +635,15 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   </div>
                   <div className="flex-1">
                     <p className={`font-bold ${pairingStage >= 1 ? 'text-zinc-100' : 'text-zinc-500'}`}>
-                      Sending Wi-Fi Credentials via {method.toUpperCase()}
+                      {selectedBrand === 'Imou_Life'
+                        ? 'Broadcasting SmartConfig & AES-128 Payload'
+                        : selectedBrand === 'V380_Pro'
+                        ? 'Transmitting V380 Acoustic Tone / AP Handshake'
+                        : 'Transmitting Xiongmai NETIP Provisioning Payload'}
                     </p>
-                    <p className="text-[10px] text-zinc-400 font-mono">SSID: {wifiSsid} (Encrypted payload)</p>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      SSID: {wifiSsid} via {method.toUpperCase()} (Port {primaryPort})
+                    </p>
                   </div>
                 </div>
 
@@ -629,9 +662,11 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   </div>
                   <div className="flex-1">
                     <p className={`font-bold ${pairingStage >= 2 ? 'text-zinc-100' : 'text-zinc-500'}`}>
-                      Camera Connecting to Router Gateway
+                      Camera Connecting to Local Gateway (DHCP ACK)
                     </p>
-                    <p className="text-[10px] text-zinc-400 font-mono">Assigned IP: 192.168.1.145</p>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      Target IP: {ipAddress} | Gateway: 192.168.1.1 (Latency: {discoveredDevice?.latencyMs || 14}ms)
+                    </p>
                   </div>
                 </div>
 
@@ -650,10 +685,14 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   </div>
                   <div className="flex-1">
                     <p className={`font-bold ${pairingStage >= 3 ? 'text-zinc-100' : 'text-zinc-500'}`}>
-                      Registering Device to Cloud Server
+                      {selectedBrand === 'Imou_Life'
+                        ? 'IMOU Dahua Cloud P2P Relay Registration'
+                        : selectedBrand === 'V380_Pro'
+                        ? 'V380 Global P2P & Media Server Binding'
+                        : 'Xiongmai NETIP Cloud Daemon Registration'}
                     </p>
                     <p className="text-[10px] text-zinc-400 font-mono">
-                      {selectedBrand.startsWith('ICSee') ? 'Xiongmai NETIP Port 34567' : 'V380 / IMOU Cloud SDK'}
+                      Primary Port: {primaryPort} | RTSP: {rtspPort} | FW: {firmwareVersion}
                     </p>
                   </div>
                 </div>
@@ -671,9 +710,11 @@ export const AddDeviceWizard: React.FC<AddDeviceWizardProps> = ({
                   </div>
                   <div className="flex-1">
                     <p className={`font-bold ${pairingStage >= 4 ? 'text-zinc-100' : 'text-zinc-500'}`}>
-                      Device Binding & Encryption Auth Complete
+                      Encryption Key Exchange & RTSP Stream Validation Complete
                     </p>
-                    <p className="text-[10px] text-zinc-400 font-mono">Admin Key: •••••••• (AES Encrypted)</p>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      Auth: Encrypted • MAC: {macAddress} • Status: ONLINE
+                    </p>
                   </div>
                 </div>
               </div>

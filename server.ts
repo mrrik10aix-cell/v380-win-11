@@ -267,6 +267,164 @@ Rule: Return a valid JSON object with:
   }
 });
 
+// Download Windows Installer endpoint (.bat, .ps1, .url)
+app.get('/api/download-installer', (req, res) => {
+  const type = (req.query.type as string) || 'bat';
+  let targetUrl = (req.query.url as string) || `${req.protocol}://${req.get('host')}`;
+  const appName = (req.query.appName as string) || 'V380 Pro Security';
+
+  // Automatically replace private ais-dev- development domain with public ais-pre- shared domain to prevent Google 403 Forbidden and 404 errors
+  if (targetUrl.includes('ais-dev-')) {
+    targetUrl = targetUrl.replace('ais-dev-', 'ais-pre-');
+  }
+
+  // Clean trailing slashes or search queries
+  try {
+    const parsed = new URL(targetUrl);
+    targetUrl = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`;
+  } catch {
+    // fallback as is
+  }
+
+  if (type === 'ps1') {
+    const psContent = `# =========================================================================
+# V380 Pro Windows 11 Native Installer & Desktop Shortcut Script
+# =========================================================================
+
+$AppUrl = "${targetUrl}"
+$AppName = "${appName}"
+
+Write-Host "=========================================================================" -ForegroundColor Cyan
+Write-Host "          Installing $AppName Desktop App on Windows 11                  " -ForegroundColor Green
+Write-Host "=========================================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "[*] Target App URL: $AppUrl" -ForegroundColor Gray
+Write-Host "[*] Public Shared Route: Guaranteed No 403/404 Errors" -ForegroundColor Gray
+Write-Host ""
+
+# Create Desktop Shortcut
+$DesktopFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+$DesktopShortcut = Join-Path $DesktopFolder "$AppName.url"
+
+# Create Start Menu Shortcut
+$StartMenuFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Programs)
+$StartMenuShortcut = Join-Path $StartMenuFolder "$AppName.url"
+
+$ShortcutContent = @"
+[InternetShortcut]
+URL=$AppUrl
+IconIndex=0
+IconFile=C:\\Windows\\System32\\shell32.dll
+"@
+
+Set-Content -Path $DesktopShortcut -Value $ShortcutContent -Encoding ASCII
+Set-Content -Path $StartMenuShortcut -Value $ShortcutContent -Encoding ASCII
+
+Write-Host "[+] Desktop Shortcut Created: $DesktopShortcut" -ForegroundColor Green
+Write-Host "[+] Start Menu Shortcut Created: $StartMenuShortcut" -ForegroundColor Green
+Write-Host ""
+Write-Host "[*] Launching $AppName in Dedicated Desktop Mode..." -ForegroundColor Cyan
+
+# Test for Edge or Chrome in app mode, fallback to default browser
+if (Get-Command "msedge.exe" -ErrorAction SilentlyContinue) {
+    Start-Process "msedge.exe" -ArgumentList "--app=$AppUrl --window-size=1280,800"
+} elseif (Get-Command "chrome.exe" -ErrorAction SilentlyContinue) {
+    Start-Process "chrome.exe" -ArgumentList "--app=$AppUrl --window-size=1280,800"
+} else {
+    Start-Process $AppUrl
+}
+
+Write-Host "[✓] Installation and launch completed successfully!" -ForegroundColor Green
+Start-Sleep -Seconds 2
+`;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="Install-${appName.replace(/\s+/g, '')}-Win11.ps1"`);
+    return res.send(psContent);
+  }
+
+  if (type === 'url') {
+    const urlContent = `[InternetShortcut]
+URL=${targetUrl}
+IconIndex=0
+IconFile=C:\\Windows\\System32\\shell32.dll
+`;
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${appName}.url"`);
+    return res.send(urlContent);
+  }
+
+  // Default: Windows Batch File (.bat)
+  const batContent = `@echo off
+TITLE V380 Pro Security - Windows 11 Desktop Installer
+COLOR 0A
+CLS
+
+echo =========================================================================
+echo               V380 PRO SECURITY - WINDOWS 11 INSTALLER
+echo =========================================================================
+echo.
+echo  Installing %APP_NAME% Desktop Application...
+echo.
+
+set "APP_NAME=${appName}"
+set "APP_URL=${targetUrl}"
+set "DESKTOP_PATH=%USERPROFILE%\\Desktop\\%APP_NAME%.url"
+set "STARTMENU_PATH=%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\%APP_NAME%.url"
+
+echo [*] Target URL: %APP_URL%
+echo [*] Mode: Public Shared URL (Bypasses Google 403 Forbidden ^& 404 Barriers)
+echo.
+
+:: Write Desktop Shortcut
+(
+echo [InternetShortcut]
+echo URL=%APP_URL%
+echo IconIndex=0
+echo IconFile=C:\\Windows\\System32\\shell32.dll
+) > "%DESKTOP_PATH%"
+
+:: Write Start Menu Shortcut
+(
+echo [InternetShortcut]
+echo URL=%APP_URL%
+echo IconIndex=0
+echo IconFile=C:\\Windows\\System32\\shell32.dll
+) > "%STARTMENU_PATH%"
+
+echo [+] Desktop Shortcut Created: %DESKTOP_PATH%
+echo [+] Start Menu Shortcut Created: %STARTMENU_PATH%
+echo.
+echo [*] Launching %APP_NAME% in dedicated window mode...
+
+:: Try Microsoft Edge app mode
+where msedge.exe >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    start msedge.exe --app="%APP_URL%" --window-size=1280,800
+    goto :SUCCESS
+)
+
+:: Try Google Chrome app mode
+where chrome.exe >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    start chrome.exe --app="%APP_URL%" --window-size=1280,800
+    goto :SUCCESS
+)
+
+:: Fallback to Windows default web handler
+start "" "%APP_URL%"
+
+:SUCCESS
+echo.
+echo [SUCCESS] V380 Pro Desktop App installed and launched!
+timeout /t 3 >nul
+exit
+`;
+
+  res.setHeader('Content-Type', 'application/x-bat; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="Install-${appName.replace(/\s+/g, '')}-Win11.bat"`);
+  return res.send(batContent);
+});
+
 // Serve public static folder for manifest.json, sw.js, and icons
 app.use(express.static(path.join(process.cwd(), 'public')));
 

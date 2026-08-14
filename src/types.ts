@@ -69,6 +69,14 @@ export interface Device {
     alarmSoundProfile: '110dB_Siren' | 'Dog_Bark' | 'Custom_Voice' | 'Mute';
     privacyMasking: boolean;
   };
+  v380Settings?: {
+    v380DeviceId: string;
+    apHotspotSsid: string;
+    smartLightLinkage: boolean;
+    voiceIntercomMode: 'half_duplex' | 'full_duplex';
+    alarmSoundMode: 'siren' | 'custom_voice';
+    cloudStoragePackage: '7_day_loop' | '30_day_loop' | 'none';
+  };
   storage: {
     cloudSyncActive: boolean;
     cloudProvider: 'Google_Drive' | 'OneDrive' | 'Google_Cloud' | 'None';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { AppTab, Device, AlarmEvent, AlbumItem, CloudSyncSettings, PresetPosition } from './types';
 import {
   INITIAL_DEVICES,
@@ -478,25 +479,45 @@ export default function App() {
             {/* Left Main Stream & Controls Area */}
             <div className="flex-1 w-full flex flex-col gap-6">
               {/* Multi-grid vs Single Stream Canvas */}
-              {gridMode !== '1' ? (
-                <MultiViewGrid
-                  devices={devices}
-                  activeDeviceId={activeDeviceId}
-                  gridMode={gridMode}
-                  onSelectDevice={setActiveDeviceId}
-                  onOpenAddDevice={() => setIsAddDeviceOpen(true)}
-                  onToggleMuteDevice={handleToggleMuteDevice}
-                />
-              ) : (
-                <CameraStreamCanvas
-                  device={activeDevice}
-                  onPanTiltChange={(pan, tilt) => handleUpdateDevice({ pan, tilt })}
-                  onTakeSnapshot={handleTakeSnapshot}
-                  isRecording={isRecording}
-                  showDetectionGridOverlay={false}
-                  onTogglePrivacyMode={() => handleUpdateDevice({ isPrivacyMode: !activeDevice.isPrivacyMode })}
-                />
-              )}
+              <AnimatePresence mode="wait">
+                {gridMode !== '1' ? (
+                  <motion.div
+                    key="multiview-grid-container"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="w-full"
+                  >
+                    <MultiViewGrid
+                      devices={devices}
+                      activeDeviceId={activeDeviceId}
+                      gridMode={gridMode}
+                      onSelectDevice={setActiveDeviceId}
+                      onOpenAddDevice={() => setIsAddDeviceOpen(true)}
+                      onToggleMuteDevice={handleToggleMuteDevice}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="single-stream-container"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="w-full"
+                  >
+                    <CameraStreamCanvas
+                      device={activeDevice}
+                      onPanTiltChange={(pan, tilt) => handleUpdateDevice({ pan, tilt })}
+                      onTakeSnapshot={handleTakeSnapshot}
+                      isRecording={isRecording}
+                      showDetectionGridOverlay={false}
+                      onTogglePrivacyMode={() => handleUpdateDevice({ isPrivacyMode: !activeDevice.isPrivacyMode })}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Camera PTZ & Action Controls */}
               <CameraControls
